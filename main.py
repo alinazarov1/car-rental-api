@@ -1,46 +1,60 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
+import models
 from pydantic import BaseModel
-class Car(BaseModel):
-    id:int
-    brand:str
-    model:str
-    price_per_day:int
-app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message":"Car Rental API is running!"}
+app=FastAPI()
+models.Base.metadata.create_all(bind=engine)
+def get_db():
+    db = SessionLocal()
+    
+    try:
+        yield db
+    finally:
+        db.close()
 
+class CarSchema(BaseModel):
+    brand: str
+    model: str
+    price_per_day: int
 
-cars = [
-    {"id":1,"brand":"Toyota","model":"Cramy","price_per_day":50},
-    {"id":2,"brand":"BMW","model":"X5","price_per_day":120},
-    {"id":3,"brand":"Honda","model":"Civic","price_per_day":40},
-]
+    class Config:
+        from_attributes = True
 @app.get("/cars")
-def get_cars():
-    return cars
-@app.get("/cars/{car_id}")
-def get_car(car_id:int):
-    for car in cars:
-        if car["id"] == car_id:
-            return car
-    return {"error":"Car not found"}
+def get_cars(db:Session = Depends(get_db)):
+    return db.query(models.Car).all()
 @app.post("/cars")
-def add_car(car:Car):
-    cars.append(car.dict())
-    return{"message":"Car added successfully","car":car}
-@app.delete("/cars/{car_id}")
-def delete_car(car_id:int):
-    for car in cars:
-        if car["id"] == car_id:
-            cars.remove(car)
-            return {"message":"Car deleted successfully"}
-    return {"error":"Car not found"}
+def add_cars(car: CarSchema,db: Session=Depends(get_db)):
+    new_car = models.Car(**car.dict())
+    db.add(new_car)
+    db.commit()
+    db.refresh(new_car)
+    return new_car
+@app.get("/cars/{car_id}")
+def get_car(car_id: int, db: Session = Depends(get_db)):
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if car is None:
+        return {"error":"Car not found"}
+    return car
 @app.put("/cars/{car_id}")
-def update_car(car_id : int, updated_car: Car):
-    for car in cars:
-        if car["id"] == car_id:
-            car.update(updated_car.dict())
-            return {"message":"Car updated succesfully"}
-    return {"error":"Car not found"}
+def update_car(car_id: int, updated_car: CarSchema,db: Session = Depends(get_db)):
+    car =  db.query(models.Car).filter(models.Car.id==car_id).first()
+    if car is None:
+        return {"error":"Car not found"}
+    for key, value in updated_car.dict().items():
+        setattr(car,key,value)
+    db.commit()
+    return{"message":"Car updated successfully"}
+@app.delete("/cars/{car_id}")
+def delete_car(car_id: int, db: Session = Depends(get_db)):
+    car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if car is None:
+        return {"error": "Car not found"}
+    db.delete(car)
+    db.commit()
+    return {"message": "Car deleted successfully"}
+
+
+
+
