@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 from pydantic import BaseModel
-from auth import hash_password,verify_password, create_access_token
+from auth import hash_password,verify_password, create_access_token,verify_token
 app=FastAPI()
 models.Base.metadata.create_all(bind=engine)
 def get_db():
@@ -13,6 +14,14 @@ def get_db():
         yield db
     finally:
         db.close()
+security = HTTPBearer()
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    username = verify_token(token)
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return username
 
 class CarSchema(BaseModel):
     brand: str
@@ -31,7 +40,7 @@ def get_cars(db:Session = Depends(get_db)):
     return db.query(models.Car).all()
 
 @app.post("/cars")
-def add_cars(car: CarSchema,db: Session=Depends(get_db)):
+def add_cars(car: CarSchema,db: Session=Depends(get_db),current_user: str = Depends(get_current_user)):
     new_car = models.Car(**car.dict())
     db.add(new_car)
     db.commit()
@@ -40,7 +49,7 @@ def add_cars(car: CarSchema,db: Session=Depends(get_db)):
 
 
 @app.get("/cars/{car_id}")
-def get_car(car_id: int, db: Session = Depends(get_db)):
+def get_car(car_id: int, db: Session = Depends(get_db),current_user: str = Depends(get_current_user)):
     car = db.query(models.Car).filter(models.Car.id == car_id).first()
     if car is None:
         return {"error":"Car not found"}
@@ -48,7 +57,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/cars/{car_id}")
-def update_car(car_id: int, updated_car: CarSchema,db: Session = Depends(get_db)):
+def update_car(car_id: int, updated_car: CarSchema,db: Session = Depends(get_db),current_user: str = Depends(get_current_user)):
     car =  db.query(models.Car).filter(models.Car.id==car_id).first()
     if car is None:
         return {"error":"Car not found"}
@@ -59,7 +68,7 @@ def update_car(car_id: int, updated_car: CarSchema,db: Session = Depends(get_db)
 
 
 @app.delete("/cars/{car_id}")
-def delete_car(car_id: int, db: Session = Depends(get_db)):
+def delete_car(car_id: int, db: Session = Depends(get_db),current_user: str = Depends(get_current_user)):
     car = db.query(models.Car).filter(models.Car.id == car_id).first()
     if car is None:
         return {"error": "Car not found"}
