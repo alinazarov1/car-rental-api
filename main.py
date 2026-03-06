@@ -1,10 +1,24 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 from pydantic import BaseModel
-from auth import hash_password,verify_password, create_access_token,verify_token
+from auth import hash_password, verify_password, create_access_token, verify_token
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://car-rental-frontend-eta-nine.vercel.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app=FastAPI()
 models.Base.metadata.create_all(bind=engine)
 def get_db():
