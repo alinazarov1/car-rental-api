@@ -13,7 +13,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://car-rental-frontend-eta-nine.vercel.app"
+        "https://car-rental-frontend-eta-nine.vercel.app",
+        "https://car-rental-frontend-5agxmofsj-alinazarov1s-projects.vercel.app",
+        "https://car-rental-frontend-git-main-alinazarov1s-projects.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
